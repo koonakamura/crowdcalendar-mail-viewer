@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Email {
+  id                   Int      @id @default(autoincrement())
+  gmailMessageId       String   @unique @map("gmail_message_id")
+  receivedAt           DateTime @map("received_at")
+  calendarType         String   @map("calendar_type")
+  companyName          String   @map("company_name")
+  registrant           String?
+  emailAddress         String?  @map("email_address")
+  phoneNumber          String?  @map("phone_number")
+  appointmentDatetime  DateTime @map("appointment_datetime")
+  appointmentEnd       DateTime? @map("appointment_end")
+  crowdCalendarUrl     String?  @map("crowd_calendar_url")
+  assignedUser         String?  @map("assigned_user")
+  note                 String?
+  qaData               Json?    @map("qa_data")
+  rawBody              String?  @map("raw_body") @db.Text
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("emails")
+}
+
+model SyncStatus {
+  id            Int      @id @default(autoincrement())
+  userEmail     String   @unique @map("user_email")
+  lastHistoryId String?  @map("last_history_id")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+
+  @@map("sync_status")
+}
