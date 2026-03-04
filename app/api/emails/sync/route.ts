@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { syncEmails } from "@/lib/gmail";
+import { prisma } from "@/lib/prisma";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,9 +18,20 @@ export async function POST() {
   }
 
   try {
+    const url = new URL(request.url);
+    const resync = url.searchParams.get("resync") === "true";
+
+    if (resync) {
+      await prisma.email.deleteMany({});
+      await prisma.syncStatus.deleteMany({});
+    }
+
     const result = await syncEmails(accessToken, session.user?.email || "");
+    const msg = resync
+      ? `再同期完了: ${result.newCount}件のメールを取得しました`
+      : `同期完了: ${result.newCount}件の新規メールを取得しました（全${result.total}件中）`;
     return NextResponse.json({
-      message: `同期完了: ${result.newCount}件の新規メールを取得しました（全${result.total}件中）`,
+      message: msg,
       ...result,
     });
   } catch (error: any) {

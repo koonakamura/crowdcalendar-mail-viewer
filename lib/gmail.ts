@@ -6,14 +6,14 @@ export function parseEmailBody(subject: string, body: string) {
   const calendarType = subjectMatch ? subjectMatch[2].trim() : "";
   const subjectCompany = subjectMatch ? subjectMatch[1].trim() : "";
 
-  const companyMatch = body.match(/○\s*会社名:\s*(.+)/);
-  const registrantMatch = body.match(/○\s*登録者:\s*(.+)/);
-  const emailMatch = body.match(/○\s*メールアドレス:\s*(.+)/);
-  const phoneMatch = body.match(/○\s*電話番号:\s*(.+)/);
-  const datetimeMatch = body.match(/○\s*日時:\s*(.+)/);
-  const urlMatch = body.match(/○\s*URL:\s*(.+)/);
-  const userMatch = body.match(/・\s*(.+?（.+?）)/);
-  const noteMatch = body.match(/○\s*備考:\s*(.*)/);
+  const companyMatch = body.match(/○[ \t]*会社名:[ \t]*(.*)/);
+  const registrantMatch = body.match(/○[ \t]*登録者:[ \t]*(.*)/);
+  const emailMatch = body.match(/○[ \t]*メールアドレス:[ \t]*(.*)/);
+  const phoneMatch = body.match(/○[ \t]*電話番号:[ \t]*(.*)/);
+  const datetimeMatch = body.match(/○[ \t]*日時:[ \t]*(.*)/);
+  const urlMatch = body.match(/○[ \t]*URL:[ \t]*(.*)/);
+  const userMatch = body.match(/・[ \t]*(.+?（.+?）)/);
+  const noteMatch = body.match(/○[ \t]*備考:[ \t]*(.*)/);
 
   let appointmentDatetime: Date | null = null;
   let appointmentEnd: Date | null = null;
@@ -25,34 +25,49 @@ export function parseEmailBody(subject: string, body: string) {
     if (dtMatch) {
       const [, year, month, day, startH, startM, endH, endM] = dtMatch;
       appointmentDatetime = new Date(
-        parseInt(year), parseInt(month) - 1, parseInt(day),
-        parseInt(startH), parseInt(startM)
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(startH),
+        parseInt(startM)
       );
       appointmentEnd = new Date(
-        parseInt(year), parseInt(month) - 1, parseInt(day),
-        parseInt(endH), parseInt(endM)
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(endH),
+        parseInt(endM)
       );
     }
   }
 
   const qaData: { q: string; a: string }[] = [];
-  const qaRegex = /◆(.+?)\n⇒(.+)/g;
+  const qaRegex = /◆(.+?)[\r\n]+⇒(.*)/g;
   let qaMatch;
   while ((qaMatch = qaRegex.exec(body)) !== null) {
-    qaData.push({ q: qaMatch[1].trim(), a: qaMatch[2].trim() });
+    qaData.push({
+      q: qaMatch[1].trim(),
+      a: qaMatch[2].trim(),
+    });
   }
+
+  const trimOrNull = (val: string | undefined): string | null => {
+    if (!val) return null;
+    const trimmed = val.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
 
   return {
     calendarType,
     companyName: companyMatch ? companyMatch[1].trim() : subjectCompany,
-    registrant: registrantMatch ? registrantMatch[1].trim() || null : null,
-    emailAddress: emailMatch ? emailMatch[1].trim() || null : null,
-    phoneNumber: phoneMatch ? phoneMatch[1].trim() || null : null,
+    registrant: registrantMatch ? trimOrNull(registrantMatch[1]) : null,
+    emailAddress: emailMatch ? trimOrNull(emailMatch[1]) : null,
+    phoneNumber: phoneMatch ? trimOrNull(phoneMatch[1]) : null,
     appointmentDatetime,
     appointmentEnd,
-    crowdCalendarUrl: urlMatch ? urlMatch[1].trim() : null,
+    crowdCalendarUrl: urlMatch ? trimOrNull(urlMatch[1]) : null,
     assignedUser: userMatch ? userMatch[1].trim() : null,
-    note: noteMatch ? noteMatch[1].trim() || null : null,
+    note: noteMatch ? trimOrNull(noteMatch[1]) : null,
     qaData: qaData.length > 0 ? qaData : null,
     rawBody: body,
   };
@@ -61,17 +76,23 @@ export function parseEmailBody(subject: string, body: string) {
 export async function syncEmails(accessToken: string, userEmail: string) {
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({ access_token: accessToken });
-  const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
+  const gmail = google.gmail({ version: "v1", auth: oauth2Client });
   const query = "from:info@crowd-calendar.com after:2026/3/2";
+
   let allMessages: any[] = [];
   let pageToken: string | undefined;
 
   do {
     const res = await gmail.users.messages.list({
-      userId: "me", q: query, maxResults: 100, pageToken,
+      userId: "me",
+      q: query,
+      maxResults: 100,
+      pageToken,
     });
-    if (res.data.messages) allMessages = allMessages.concat(res.data.messages);
+    if (res.data.messages) {
+      allMessages = allMessages.concat(res.data.messages);
+    }
     pageToken = res.data.nextPageToken || undefined;
   } while (pageToken);
 
@@ -84,7 +105,9 @@ export async function syncEmails(accessToken: string, userEmail: string) {
     if (existing) continue;
 
     const detail = await gmail.users.messages.get({
-      userId: "me", id: msg.id, format: "full",
+      userId: "me",
+      id: msg.id,
+      format: "full",
     });
 
     const headers = detail.data.payload?.headers || [];
@@ -104,7 +127,9 @@ export async function syncEmails(accessToken: string, userEmail: string) {
         const htmlPart = payload.parts.find((p: any) => p.mimeType === "text/html");
         if (htmlPart?.body?.data) {
           body = Buffer.from(htmlPart.body.data, "base64")
-            .toString("utf-8").replace(/<[^>]*>/g, "\n").replace(/\n{2,}/g, "\n");
+            .toString("utf-8")
+            .replace(/<[^>]*>/g, "\n")
+            .replace(/\n{2,}/g, "\n");
         }
       }
     }
@@ -114,15 +139,20 @@ export async function syncEmails(accessToken: string, userEmail: string) {
     if (parsed.appointmentDatetime) {
       await prisma.email.create({
         data: {
-          gmailMessageId: msg.id, receivedAt,
-          calendarType: parsed.calendarType, companyName: parsed.companyName,
-          registrant: parsed.registrant, emailAddress: parsed.emailAddress,
+          gmailMessageId: msg.id,
+          receivedAt,
+          calendarType: parsed.calendarType,
+          companyName: parsed.companyName,
+          registrant: parsed.registrant,
+          emailAddress: parsed.emailAddress,
           phoneNumber: parsed.phoneNumber,
           appointmentDatetime: parsed.appointmentDatetime,
           appointmentEnd: parsed.appointmentEnd,
           crowdCalendarUrl: parsed.crowdCalendarUrl,
-          assignedUser: parsed.assignedUser, note: parsed.note,
-          qaData: parsed.qaData || undefined, rawBody: parsed.rawBody,
+          assignedUser: parsed.assignedUser,
+          note: parsed.note,
+          qaData: parsed.qaData || undefined,
+          rawBody: parsed.rawBody,
         },
       });
       newCount++;
