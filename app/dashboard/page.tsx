@@ -26,11 +26,13 @@ type FiltersData = {
   assignedUsers: string[];
 };
 
-// Q&Aデータから特定の質問の回答を取得
-function getQaValue(qaData: { q: string; a: string }[] | null, key: string): string {
+function getQaValue(qaData: { q: string; a: string }[] | null, ...keys: string[]): string {
   if (!qaData) return "";
-  const item = qaData.find((qa) => qa.q.includes(key));
-  return item ? item.a : "";
+  for (const key of keys) {
+    const item = qaData.find((qa) => qa.q.includes(key));
+    if (item) return item.a;
+  }
+  return "";
 }
 
 export default function Dashboard() {
@@ -48,7 +50,6 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
-  // フィルター・ソート・ページ
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(100);
   const [sortBy, setSortBy] = useState("receivedAt");
@@ -93,11 +94,12 @@ export default function Dashboard() {
     }
   }, [status, fetchEmails, router]);
 
-  const handleSync = async () => {
+  const handleSync = async (resync = false) => {
     setSyncing(true);
     setSyncMessage("");
     try {
-      const res = await fetch("/api/emails/sync", { method: "POST" });
+      const url = resync ? "/api/emails/sync?resync=true" : "/api/emails/sync";
+      const res = await fetch(url, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         setSyncMessage(data.message);
@@ -150,11 +152,10 @@ export default function Dashboard() {
     );
   }
 
-  const COL_COUNT = 14;
+  const COL_COUNT = 16;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-900">
@@ -165,11 +166,18 @@ export default function Dashboard() {
               {session?.user?.email}
             </span>
             <button
-              onClick={handleSync}
+              onClick={() => handleSync(false)}
               disabled={syncing}
               className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             >
               {syncing ? "同期中..." : "同期"}
+            </button>
+            <button
+              onClick={() => { if (confirm("全データを削除して再取得します。よろしいですか？")) handleSync(true); }}
+              disabled={syncing}
+              className="px-3 py-1.5 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
+            >
+              再同期
             </button>
             <button
               onClick={handleExport}
@@ -187,7 +195,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* 同期メッセージ */}
       {syncMessage && (
         <div className="max-w-full mx-auto px-4 py-2">
           <div className="bg-blue-50 border border-blue-200 rounded p-2 text-sm text-blue-800">
@@ -196,7 +203,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* フィルター */}
       <div className="max-w-full mx-auto px-4 py-3">
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -266,10 +272,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* テーブル */}
       <div className="max-w-full mx-auto px-4 pb-4">
         <div className="bg-white rounded-lg shadow-sm border overflow-x-auto">
-          <table className="text-sm" style={{ minWidth: "1800px", width: "100%" }}>
+          <table className="text-sm" style={{ minWidth: "2200px", width: "100%" }}>
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("receivedAt")}>
@@ -296,6 +301,8 @@ export default function Dashboard() {
                 <th className="px-2 py-2 text-left whitespace-nowrap">QAメールアドレス</th>
                 <th className="px-2 py-2 text-left whitespace-nowrap">提案取得者所属</th>
                 <th className="px-2 py-2 text-left whitespace-nowrap">先方連絡先</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">課題・興味</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">その他</th>
               </tr>
             </thead>
             <tbody>
@@ -320,12 +327,7 @@ export default function Dashboard() {
                     <td className="px-2 py-2 whitespace-nowrap">{email.calendarType}</td>
                     <td className="px-2 py-2 font-medium">
                       {email.crowdCalendarUrl ? (
-                        <a
-                          href={email.crowdCalendarUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
+                        <a href={email.crowdCalendarUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                           {email.companyName}
                         </a>
                       ) : (
@@ -345,19 +347,36 @@ export default function Dashboard() {
                     <td className="px-2 py-2 text-xs">{email.registrant || ""}</td>
                     <td className="px-2 py-2 text-xs">{email.emailAddress || ""}</td>
                     <td className="px-2 py-2 text-xs whitespace-nowrap">{email.phoneNumber || ""}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "先方参加者")}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "支援中のサービス")}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "取得者")}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "メールアドレス")}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "提案取得者所属")}</td>
-                    <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "先方連絡先")}</td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "先方参加者", "参加予定", "役職", "氏名")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "支援中のサービス", "現在提供している支援サービス")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "取得者", "面談調整")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "メールアドレスを教えて", "メールアドレス")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "提案取得者所属")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "先方連絡先", "ご連絡先")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "課題感", "興味")}
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {getQaValue(email.qaData, "その他", "ご要望")}
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
 
-          {/* ページネーション */}
           <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>全{totalCount}件</span>

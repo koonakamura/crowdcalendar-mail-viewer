@@ -28,10 +28,13 @@ export async function GET(request: NextRequest) {
     orderBy: { receivedAt: "desc" },
   });
 
-  function getQaValue(qaData: any, key: string): string {
+  function getQaValue(qaData: any, ...keys: string[]): string {
     if (!qaData || !Array.isArray(qaData)) return "";
-    const item = (qaData as any[]).find((qa: any) => qa.q && qa.q.includes(key));
-    return item ? item.a : "";
+    for (const key of keys) {
+      const item = (qaData as any[]).find((qa: any) => qa.q && qa.q.includes(key));
+      if (item) return item.a;
+    }
+    return "";
   }
 
   const BOM = "\uFEFF";
@@ -51,27 +54,31 @@ export async function GET(request: NextRequest) {
     "QAメールアドレス",
     "提案取得者所属",
     "先方連絡先",
+    "課題・興味",
+    "その他",
     "URL",
     "備考",
   ];
 
   const rows = emails.map((e) => {
     return [
-      formatDate(e.receivedAt),
+      formatDateJST(e.receivedAt),
       e.calendarType,
       e.companyName,
-      formatDate(e.appointmentDatetime),
-      e.appointmentEnd ? formatDate(e.appointmentEnd) : "",
+      formatDateJST(e.appointmentDatetime),
+      e.appointmentEnd ? formatDateJST(e.appointmentEnd) : "",
       e.assignedUser || "",
       e.registrant || "",
       e.emailAddress || "",
       e.phoneNumber || "",
-      getQaValue(e.qaData, "先方参加者"),
-      getQaValue(e.qaData, "支援中のサービス"),
-      getQaValue(e.qaData, "取得者"),
-      getQaValue(e.qaData, "メールアドレス"),
+      getQaValue(e.qaData, "先方参加者", "参加予定", "役職", "氏名"),
+      getQaValue(e.qaData, "支援中のサービス", "現在提供している支援サービス"),
+      getQaValue(e.qaData, "取得者", "面談調整"),
+      getQaValue(e.qaData, "メールアドレスを教えて", "メールアドレス"),
       getQaValue(e.qaData, "提案取得者所属"),
-      getQaValue(e.qaData, "先方連絡先"),
+      getQaValue(e.qaData, "先方連絡先", "ご連絡先"),
+      getQaValue(e.qaData, "課題感", "興味"),
+      getQaValue(e.qaData, "その他", "ご要望"),
       e.crowdCalendarUrl || "",
       e.note || "",
     ].map(escapeCsv);
@@ -90,9 +97,9 @@ export async function GET(request: NextRequest) {
   });
 }
 
-function formatDate(date: Date): string {
-  const d = new Date(date);
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+function formatDateJST(date: Date): string {
+  const jst = new Date(new Date(date).getTime() + 9 * 60 * 60 * 1000);
+  return `${jst.getUTCFullYear()}/${String(jst.getUTCMonth() + 1).padStart(2, "0")}/${String(jst.getUTCDate()).padStart(2, "0")} ${String(jst.getUTCHours()).padStart(2, "0")}:${String(jst.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 function escapeCsv(value: string): string {

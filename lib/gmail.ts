@@ -24,20 +24,8 @@ export function parseEmailBody(subject: string, body: string) {
     );
     if (dtMatch) {
       const [, year, month, day, startH, startM, endH, endM] = dtMatch;
-      appointmentDatetime = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(startH),
-        parseInt(startM)
-      );
-      appointmentEnd = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(endH),
-        parseInt(endM)
-      );
+      appointmentDatetime = new Date(`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${startH.padStart(2,'0')}:${startM}:00+09:00`);
+      appointmentEnd = new Date(`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${endH.padStart(2,'0')}:${endM}:00+09:00`);
     }
   }
 
@@ -45,10 +33,7 @@ export function parseEmailBody(subject: string, body: string) {
   const qaRegex = /◆(.+?)[\r\n]+⇒(.*)/g;
   let qaMatch;
   while ((qaMatch = qaRegex.exec(body)) !== null) {
-    qaData.push({
-      q: qaMatch[1].trim(),
-      a: qaMatch[2].trim(),
-    });
+    qaData.push({ q: qaMatch[1].trim(), a: qaMatch[2].trim() });
   }
 
   const trimOrNull = (val: string | undefined): string | null => {
