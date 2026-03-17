@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Email = {
@@ -24,6 +24,8 @@ type Email = {
 type FiltersData = {
   calendarTypes: string[];
   assignedUsers: string[];
+  services: string[];
+  departments: string[];
 };
 
 function getQaValue(qaData: { q: string; a: string }[] | null, ...keys: string[]): string {
@@ -33,6 +35,81 @@ function getQaValue(qaData: { q: string; a: string }[] | null, ...keys: string[]
     if (item) return item.a;
   }
   return "";
+}
+
+// 複数選択ドロップダウンコンポーネント
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) {
+      onChange(selected.filter((v) => v !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full border rounded px-2 py-1.5 text-sm text-left bg-white flex justify-between items-center"
+      >
+        <span className="truncate text-gray-700">
+          {selected.length === 0 ? (
+            <span className="text-gray-400">{placeholder}</span>
+          ) : (
+            selected.join(", ")
+          )}
+        </span>
+        <span className="ml-1 text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 min-w-full bg-white border rounded shadow-lg max-h-48 overflow-y-auto mt-1">
+          {options.length === 0 ? (
+            <div className="px-2 py-2 text-sm text-gray-400">選択肢なし</div>
+          ) : (
+            options.map((opt) => (
+              <label
+                key={opt}
+                className="flex items-center px-2 py-1.5 hover:bg-gray-50 cursor-pointer text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt)}
+                  onChange={() => toggle(opt)}
+                  className="mr-2"
+                />
+                {opt}
+              </label>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -45,6 +122,8 @@ export default function Dashboard() {
   const [filtersData, setFiltersData] = useState<FiltersData>({
     calendarTypes: [],
     assignedUsers: [],
+    services: [],
+    departments: [],
   });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -54,11 +133,19 @@ export default function Dashboard() {
   const [perPage, setPerPage] = useState(100);
   const [sortBy, setSortBy] = useState("receivedAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [calendarType, setCalendarType] = useState("");
+
+  // 複数選択フィルター
+  const [calendarTypes, setCalendarTypes] = useState<string[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+
+  // テキスト・日付フィルター
   const [company, setCompany] = useState("");
-  const [assignedUser, setAssignedUser] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [receivedFrom, setReceivedFrom] = useState("");
+  const [receivedTo, setReceivedTo] = useState("");
+  const [appointmentFrom, setAppointmentFrom] = useState("");
+  const [appointmentTo, setAppointmentTo] = useState("");
 
   const fetchEmails = useCallback(async () => {
     setLoading(true);
@@ -68,11 +155,15 @@ export default function Dashboard() {
       sortBy,
       sortOrder,
     });
-    if (calendarType) params.set("calendarType", calendarType);
+    if (calendarTypes.length > 0) params.set("calendarTypes", calendarTypes.join(","));
     if (company) params.set("company", company);
-    if (assignedUser) params.set("assignedUser", assignedUser);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
+    if (assignedUsers.length > 0) params.set("assignedUsers", assignedUsers.join(","));
+    if (receivedFrom) params.set("dateFrom", receivedFrom);
+    if (receivedTo) params.set("dateTo", receivedTo);
+    if (appointmentFrom) params.set("appointmentFrom", appointmentFrom);
+    if (appointmentTo) params.set("appointmentTo", appointmentTo);
+    if (services.length > 0) params.set("services", services.join(","));
+    if (departments.length > 0) params.set("departments", departments.join(","));
 
     const res = await fetch(`/api/emails?${params}`);
     if (res.ok) {
@@ -80,10 +171,15 @@ export default function Dashboard() {
       setEmails(data.emails);
       setTotalCount(data.totalCount);
       setTotalPages(data.totalPages);
-      setFiltersData(data.filters);
+      setFiltersData({
+        calendarTypes: data.filters?.calendarTypes ?? [],
+        assignedUsers: data.filters?.assignedUsers ?? [],
+        services: data.filters?.services ?? [],
+        departments: data.filters?.departments ?? [],
+      });
     }
     setLoading(false);
-  }, [page, perPage, sortBy, sortOrder, calendarType, company, assignedUser, dateFrom, dateTo]);
+  }, [page, perPage, sortBy, sortOrder, calendarTypes, company, assignedUsers, receivedFrom, receivedTo, appointmentFrom, appointmentTo, services, departments]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -115,12 +211,29 @@ export default function Dashboard() {
 
   const handleExport = () => {
     const params = new URLSearchParams();
-    if (calendarType) params.set("calendarType", calendarType);
+    if (calendarTypes.length > 0) params.set("calendarTypes", calendarTypes.join(","));
     if (company) params.set("company", company);
-    if (assignedUser) params.set("assignedUser", assignedUser);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
+    if (assignedUsers.length > 0) params.set("assignedUsers", assignedUsers.join(","));
+    if (receivedFrom) params.set("dateFrom", receivedFrom);
+    if (receivedTo) params.set("dateTo", receivedTo);
+    if (appointmentFrom) params.set("appointmentFrom", appointmentFrom);
+    if (appointmentTo) params.set("appointmentTo", appointmentTo);
+    if (services.length > 0) params.set("services", services.join(","));
+    if (departments.length > 0) params.set("departments", departments.join(","));
     window.location.href = `/api/emails/export?${params}`;
+  };
+
+  const handleReset = () => {
+    setCalendarTypes([]);
+    setCompany("");
+    setAssignedUsers([]);
+    setReceivedFrom("");
+    setReceivedTo("");
+    setAppointmentFrom("");
+    setAppointmentTo("");
+    setServices([]);
+    setDepartments([]);
+    setPage(1);
   };
 
   const handleSort = (field: string) => {
@@ -159,13 +272,9 @@ export default function Dashboard() {
       {/* ヘッダー固定 */}
       <header className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-900">
-            CrowdCalendar Mail Viewer
-          </h1>
+          <h1 className="text-lg font-bold text-gray-900">CrowdCalendar Mail Viewer</h1>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">
-              {session?.user?.email}
-            </span>
+            <span className="text-sm text-gray-600">{session?.user?.email}</span>
             <button
               onClick={() => handleSync(false)}
               disabled={syncing}
@@ -208,21 +317,20 @@ export default function Dashboard() {
       {/* フィルター固定 */}
       <div className="max-w-full mx-auto px-4 py-3 w-full flex-shrink-0">
         <div className="bg-white rounded-lg shadow-sm border p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div>
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* カレンダー種別（複数選択） */}
+            <div className="w-40">
               <label className="block text-xs text-gray-500 mb-1">カレンダー種別</label>
-              <select
-                value={calendarType}
-                onChange={(e) => { setCalendarType(e.target.value); setPage(1); }}
-                className="w-full border rounded px-2 py-1.5 text-sm"
-              >
-                <option value="">すべて</option>
-                {filtersData.calendarTypes.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <MultiSelect
+                options={filtersData.calendarTypes}
+                selected={calendarTypes}
+                onChange={(v) => { setCalendarTypes(v); setPage(1); }}
+                placeholder="すべて"
+              />
             </div>
-            <div>
+
+            {/* 会社名 */}
+            <div className="w-36">
               <label className="block text-xs text-gray-500 mb-1">会社名</label>
               <input
                 type="text"
@@ -232,41 +340,89 @@ export default function Dashboard() {
                 className="w-full border rounded px-2 py-1.5 text-sm"
               />
             </div>
-            <div>
+
+            {/* 予定追加ユーザー（複数選択） */}
+            <div className="w-40">
               <label className="block text-xs text-gray-500 mb-1">予定追加ユーザー</label>
-              <select
-                value={assignedUser}
-                onChange={(e) => { setAssignedUser(e.target.value); setPage(1); }}
-                className="w-full border rounded px-2 py-1.5 text-sm"
-              >
-                <option value="">すべて</option>
-                {filtersData.assignedUsers.map((u) => (
-                  <option key={u} value={u!}>{u}</option>
-                ))}
-              </select>
+              <MultiSelect
+                options={filtersData.assignedUsers}
+                selected={assignedUsers}
+                onChange={(v) => { setAssignedUsers(v); setPage(1); }}
+                placeholder="すべて"
+              />
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">期間（開始）</label>
+
+            {/* 受信期間開始 */}
+            <div className="w-36">
+              <label className="block text-xs text-gray-500 mb-1">受信期間開始</label>
               <input
                 type="date"
-                value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                value={receivedFrom}
+                onChange={(e) => { setReceivedFrom(e.target.value); setPage(1); }}
                 className="w-full border rounded px-2 py-1.5 text-sm"
               />
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">期間（終了）</label>
+
+            {/* 受信期間終了 */}
+            <div className="w-36">
+              <label className="block text-xs text-gray-500 mb-1">受信期間終了</label>
               <input
                 type="date"
-                value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                value={receivedTo}
+                onChange={(e) => { setReceivedTo(e.target.value); setPage(1); }}
                 className="w-full border rounded px-2 py-1.5 text-sm"
               />
             </div>
+
+            {/* 予定日時開始 */}
+            <div className="w-36">
+              <label className="block text-xs text-gray-500 mb-1">予定日時開始</label>
+              <input
+                type="date"
+                value={appointmentFrom}
+                onChange={(e) => { setAppointmentFrom(e.target.value); setPage(1); }}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+
+            {/* 予定日時終了 */}
+            <div className="w-36">
+              <label className="block text-xs text-gray-500 mb-1">予定日時終了</label>
+              <input
+                type="date"
+                value={appointmentTo}
+                onChange={(e) => { setAppointmentTo(e.target.value); setPage(1); }}
+                className="w-full border rounded px-2 py-1.5 text-sm"
+              />
+            </div>
+
+            {/* 支援中のサービス（複数選択） */}
+            <div className="w-40">
+              <label className="block text-xs text-gray-500 mb-1">支援中のサービス</label>
+              <MultiSelect
+                options={filtersData.services}
+                selected={services}
+                onChange={(v) => { setServices(v); setPage(1); }}
+                placeholder="すべて"
+              />
+            </div>
+
+            {/* 提案取得者所属（複数選択） */}
+            <div className="w-40">
+              <label className="block text-xs text-gray-500 mb-1">提案取得者所属</label>
+              <MultiSelect
+                options={filtersData.departments}
+                selected={departments}
+                onChange={(v) => { setDepartments(v); setPage(1); }}
+                placeholder="すべて"
+              />
+            </div>
+
+            {/* リセット */}
             <div className="flex items-end">
               <button
-                onClick={() => { setCalendarType(""); setCompany(""); setAssignedUser(""); setDateFrom(""); setDateTo(""); setPage(1); }}
-                className="w-full px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                onClick={handleReset}
+                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200 whitespace-nowrap"
               >
                 リセット
               </button>
@@ -275,14 +431,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* テーブルエリア: 残りの高さを全部使ってスクロール */}
+      {/* テーブルエリア */}
       <div className="max-w-full mx-auto px-4 pb-4 w-full flex-1 overflow-hidden flex flex-col">
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col h-full">
-
-          {/* テーブル本体: 縦横スクロール */}
           <div className="overflow-x-auto overflow-y-auto flex-1">
             <table className="text-sm" style={{ minWidth: "2200px", width: "100%" }}>
-              {/* theadをstickyで固定 */}
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b">
                   <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("receivedAt")}>
@@ -329,9 +482,7 @@ export default function Dashboard() {
                 ) : (
                   emails.map((email) => (
                     <tr key={email.id} className="border-b hover:bg-blue-50">
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {formatDate(email.receivedAt)}
-                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{formatDate(email.receivedAt)}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{email.calendarType}</td>
                       <td className="px-2 py-2 font-medium">
                         {email.crowdCalendarUrl ? (
@@ -342,43 +493,22 @@ export default function Dashboard() {
                           email.companyName
                         )}
                       </td>
+                      {/* 変更7: 終了時刻を削除 */}
                       <td className="px-2 py-2 whitespace-nowrap">
                         {formatDate(email.appointmentDatetime)}
-                        {email.appointmentEnd && (
-                          <span className="text-gray-400">
-                            {" "}- {new Date(email.appointmentEnd).getHours()}:
-                            {String(new Date(email.appointmentEnd).getMinutes()).padStart(2, "0")}
-                          </span>
-                        )}
                       </td>
                       <td className="px-2 py-2 text-xs">{email.assignedUser}</td>
                       <td className="px-2 py-2 text-xs">{email.registrant || ""}</td>
                       <td className="px-2 py-2 text-xs">{email.emailAddress || ""}</td>
                       <td className="px-2 py-2 text-xs whitespace-nowrap">{email.phoneNumber || ""}</td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "先方参加者", "参加予定", "役職", "氏名")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "支援中のサービス", "現在提供している支援サービス")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "取得者", "面談調整")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "メールアドレスを教えて", "メールアドレス")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "提案取得者所属")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "先方連絡先", "ご連絡先")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "課題感", "興味")}
-                      </td>
-                      <td className="px-2 py-2 text-xs">
-                        {getQaValue(email.qaData, "その他", "ご要望")}
-                      </td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "先方参加者", "参加予定", "役職", "氏名")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "支援中のサービス", "現在提供している支援サービス")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "取得者", "面談調整")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "メールアドレスを教えて", "メールアドレス")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "提案取得者所属")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "先方連絡先", "ご連絡先")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "課題感", "興味")}</td>
+                      <td className="px-2 py-2 text-xs">{getQaValue(email.qaData, "その他", "ご要望")}</td>
                     </tr>
                   ))
                 )}
@@ -386,7 +516,7 @@ export default function Dashboard() {
             </table>
           </div>
 
-          {/* ページネーション固定 */}
+          {/* ページネーション */}
           <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 flex-shrink-0">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>全{totalCount}件</span>
@@ -408,9 +538,7 @@ export default function Dashboard() {
               >
                 前へ
               </button>
-              <span className="text-sm text-gray-600">
-                {page} / {totalPages || 1}
-              </span>
+              <span className="text-sm text-gray-600">{page} / {totalPages || 1}</span>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={page >= totalPages}
