@@ -155,8 +155,9 @@ export default function Dashboard() {
   const COL_COUNT = 16;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      {/* ヘッダー固定 */}
+      <header className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-900">
             CrowdCalendar Mail Viewer
@@ -195,15 +196,17 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* 同期メッセージ固定 */}
       {syncMessage && (
-        <div className="max-w-full mx-auto px-4 py-2">
+        <div className="max-w-full mx-auto px-4 py-2 w-full flex-shrink-0">
           <div className="bg-blue-50 border border-blue-200 rounded p-2 text-sm text-blue-800">
             {syncMessage}
           </div>
         </div>
       )}
 
-      <div className="max-w-full mx-auto px-4 py-3">
+      {/* フィルター固定 */}
+      <div className="max-w-full mx-auto px-4 py-3 w-full flex-shrink-0">
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
@@ -272,112 +275,119 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="max-w-full mx-auto px-4 pb-4">
-        <div className="bg-white rounded-lg shadow-sm border overflow-x-auto">
-          <table className="text-sm" style={{ minWidth: "2200px", width: "100%" }}>
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("receivedAt")}>
-                  受信日時<SortIcon field="receivedAt" />
-                </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("calendarType")}>
-                  カレンダー種別<SortIcon field="calendarType" />
-                </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("companyName")}>
-                  会社名<SortIcon field="companyName" />
-                </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("appointmentDatetime")}>
-                  予定日時<SortIcon field="appointmentDatetime" />
-                </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("assignedUser")}>
-                  予定追加ユーザー<SortIcon field="assignedUser" />
-                </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">登録者</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">メールアドレス</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">電話番号</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">先方参加者</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">支援中のサービス</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">取得者</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">QAメールアドレス</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">提案取得者所属</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">先方連絡先</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">課題・興味</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">その他</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={COL_COUNT} className="px-3 py-8 text-center text-gray-500">
-                    読み込み中...
-                  </td>
+      {/* テーブルエリア: 残りの高さを全部使ってスクロール */}
+      <div className="max-w-full mx-auto px-4 pb-4 w-full flex-1 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col h-full">
+
+          {/* テーブル本体: 縦横スクロール */}
+          <div className="overflow-x-auto overflow-y-auto flex-1">
+            <table className="text-sm" style={{ minWidth: "2200px", width: "100%" }}>
+              {/* theadをstickyで固定 */}
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50 border-b">
+                  <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("receivedAt")}>
+                    受信日時<SortIcon field="receivedAt" />
+                  </th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("calendarType")}>
+                    カレンダー種別<SortIcon field="calendarType" />
+                  </th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("companyName")}>
+                    会社名<SortIcon field="companyName" />
+                  </th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("appointmentDatetime")}>
+                    予定日時<SortIcon field="appointmentDatetime" />
+                  </th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100" onClick={() => handleSort("assignedUser")}>
+                    予定追加ユーザー<SortIcon field="assignedUser" />
+                  </th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">登録者</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">メールアドレス</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">電話番号</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">先方参加者</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">支援中のサービス</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">取得者</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">QAメールアドレス</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">提案取得者所属</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">先方連絡先</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">課題・興味</th>
+                  <th className="px-2 py-2 text-left whitespace-nowrap">その他</th>
                 </tr>
-              ) : emails.length === 0 ? (
-                <tr>
-                  <td colSpan={COL_COUNT} className="px-3 py-8 text-center text-gray-500">
-                    データがありません。「同期」ボタンでメールを取得してください。
-                  </td>
-                </tr>
-              ) : (
-                emails.map((email) => (
-                  <tr key={email.id} className="border-b hover:bg-blue-50">
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {formatDate(email.receivedAt)}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">{email.calendarType}</td>
-                    <td className="px-2 py-2 font-medium">
-                      {email.crowdCalendarUrl ? (
-                        <a href={email.crowdCalendarUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          {email.companyName}
-                        </a>
-                      ) : (
-                        email.companyName
-                      )}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {formatDate(email.appointmentDatetime)}
-                      {email.appointmentEnd && (
-                        <span className="text-gray-400">
-                          {" "}- {new Date(email.appointmentEnd).getHours()}:
-                          {String(new Date(email.appointmentEnd).getMinutes()).padStart(2, "0")}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-xs">{email.assignedUser}</td>
-                    <td className="px-2 py-2 text-xs">{email.registrant || ""}</td>
-                    <td className="px-2 py-2 text-xs">{email.emailAddress || ""}</td>
-                    <td className="px-2 py-2 text-xs whitespace-nowrap">{email.phoneNumber || ""}</td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "先方参加者", "参加予定", "役職", "氏名")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "支援中のサービス", "現在提供している支援サービス")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "取得者", "面談調整")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "メールアドレスを教えて", "メールアドレス")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "提案取得者所属")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "先方連絡先", "ご連絡先")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "課題感", "興味")}
-                    </td>
-                    <td className="px-2 py-2 text-xs">
-                      {getQaValue(email.qaData, "その他", "ご要望")}
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={COL_COUNT} className="px-3 py-8 text-center text-gray-500">
+                      読み込み中...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : emails.length === 0 ? (
+                  <tr>
+                    <td colSpan={COL_COUNT} className="px-3 py-8 text-center text-gray-500">
+                      データがありません。「同期」ボタンでメールを取得してください。
+                    </td>
+                  </tr>
+                ) : (
+                  emails.map((email) => (
+                    <tr key={email.id} className="border-b hover:bg-blue-50">
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {formatDate(email.receivedAt)}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{email.calendarType}</td>
+                      <td className="px-2 py-2 font-medium">
+                        {email.crowdCalendarUrl ? (
+                          <a href={email.crowdCalendarUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            {email.companyName}
+                          </a>
+                        ) : (
+                          email.companyName
+                        )}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {formatDate(email.appointmentDatetime)}
+                        {email.appointmentEnd && (
+                          <span className="text-gray-400">
+                            {" "}- {new Date(email.appointmentEnd).getHours()}:
+                            {String(new Date(email.appointmentEnd).getMinutes()).padStart(2, "0")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-xs">{email.assignedUser}</td>
+                      <td className="px-2 py-2 text-xs">{email.registrant || ""}</td>
+                      <td className="px-2 py-2 text-xs">{email.emailAddress || ""}</td>
+                      <td className="px-2 py-2 text-xs whitespace-nowrap">{email.phoneNumber || ""}</td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "先方参加者", "参加予定", "役職", "氏名")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "支援中のサービス", "現在提供している支援サービス")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "取得者", "面談調整")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "メールアドレスを教えて", "メールアドレス")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "提案取得者所属")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "先方連絡先", "ご連絡先")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "課題感", "興味")}
+                      </td>
+                      <td className="px-2 py-2 text-xs">
+                        {getQaValue(email.qaData, "その他", "ご要望")}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+          {/* ページネーション固定 */}
+          <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 flex-shrink-0">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>全{totalCount}件</span>
               <select
