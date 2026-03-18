@@ -122,26 +122,36 @@ export async function syncEmails(accessToken: string, userEmail: string) {
     const parsed = parseEmailBody(subject, body);
 
     if (parsed.appointmentDatetime) {
-await prisma.email.upsert({
-  where: { gmailMessageId: msg.id },
-  update: {},
-  create: {
-    gmailMessageId: msg.id,
-    receivedAt,
-    calendarType: parsed.calendarType,
-    companyName: parsed.companyName,
-    registrant: parsed.registrant,
-    emailAddress: parsed.emailAddress,
-    phoneNumber: parsed.phoneNumber,
-    appointmentDatetime: parsed.appointmentDatetime,
-    appointmentEnd: parsed.appointmentEnd,
-    crowdCalendarUrl: parsed.crowdCalendarUrl,
-    assignedUser: parsed.assignedUser,
-    note: parsed.note,
-    qaData: parsed.qaData || undefined,
-    rawBody: parsed.rawBody,
-  },
-});
+      // 同じ会社・予定日時・受信日時のレコードが既にあればスキップ
+      const duplicate = await prisma.email.findFirst({
+        where: {
+          companyName: parsed.companyName,
+          appointmentDatetime: parsed.appointmentDatetime,
+          receivedAt: receivedAt,
+        },
+      });
+      if (duplicate) continue;
+
+      await prisma.email.upsert({
+        where: { gmailMessageId: msg.id },
+        update: {},
+        create: {
+          gmailMessageId: msg.id,
+          receivedAt,
+          calendarType: parsed.calendarType,
+          companyName: parsed.companyName,
+          registrant: parsed.registrant,
+          emailAddress: parsed.emailAddress,
+          phoneNumber: parsed.phoneNumber,
+          appointmentDatetime: parsed.appointmentDatetime,
+          appointmentEnd: parsed.appointmentEnd,
+          crowdCalendarUrl: parsed.crowdCalendarUrl,
+          assignedUser: parsed.assignedUser,
+          note: parsed.note,
+          qaData: parsed.qaData || undefined,
+          rawBody: parsed.rawBody,
+        },
+      });
       newCount++;
     }
   }
