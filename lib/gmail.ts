@@ -63,7 +63,7 @@ export async function syncEmails(accessToken: string, userEmail: string) {
   oauth2Client.setCredentials({ access_token: accessToken });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const query = "from:info@crowd-calendar.com after:2026/3/2";
+  const query = "from:info@crowd-calendar.com";
 
   let allMessages: any[] = [];
   let pageToken: string | undefined;
@@ -82,6 +82,7 @@ export async function syncEmails(accessToken: string, userEmail: string) {
   } while (pageToken);
 
   let newCount = 0;
+  let updatedCount = 0;
 
   for (const msg of allMessages) {
     const existing = await prisma.email.findUnique({
@@ -122,22 +123,13 @@ export async function syncEmails(accessToken: string, userEmail: string) {
     const parsed = parseEmailBody(subject, body);
 
     if (parsed.appointmentDatetime) {
-      // 同じ会社・予定日時・受信日時のレコードが既にあればスキップ
-      const duplicate = await prisma.email.findFirst({
-        where: {
-          companyName: parsed.companyName,
-          appointmentDatetime: parsed.appointmentDatetime,
-          receivedAt: receivedAt,
-        },
-      });
-      if (duplicate) continue;
-
       await prisma.email.upsert({
         where: { gmailMessageId: msg.id },
         update: {},
         create: {
           gmailMessageId: msg.id,
           receivedAt,
+          subject,
           calendarType: parsed.calendarType,
           companyName: parsed.companyName,
           registrant: parsed.registrant,
@@ -156,11 +148,38 @@ export async function syncEmails(accessToken: string, userEmail: string) {
     }
   }
 
+  // 既存レコードでsubjectが未設定のものを補完
+  const emailsWithoutSubject = await prisma.email.findMany({
+    where: { subject: null },
+    select: { id: true, gmailMessageId: true },
+  });
+
+  for (const email of emailsWithoutSubject) {
+    try {
+      const detail = await gmail.users.messages.get({
+        userId: "me",
+        id: email.gmailMessageId,
+        format: "metadata",
+        metadataHeaders: ["Subject"],
+      });
+      const subject = detail.data.payload?.headers?.find(
+        (h: any) => h.name === "Subject"
+      )?.value || "";
+      await prisma.email.update({
+        where: { id: email.id },
+        data: { subject },
+      });
+      updatedCount++;
+    } catch {
+      // メッセージが削除済みの場合はスキップ
+    }
+  }
+
   await prisma.syncStatus.upsert({
     where: { userEmail },
     update: { lastSyncedAt: new Date() },
     create: { userEmail, lastSyncedAt: new Date() },
   });
 
-  return { total: allMessages.length, newCount };
+  return { total: allMessages.length, newCount, updatedCount };
 }

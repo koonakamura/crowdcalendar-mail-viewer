@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Email = {
   id: number;
@@ -26,6 +27,11 @@ type FiltersData = {
   assignedUsers: string[];
   services: string[];
   departments: string[];
+};
+
+type SyncInfo = {
+  lastSyncedAt: string | null;
+  totalEmails: number;
 };
 
 function getQaValue(qaData: { q: string; a: string }[] | null, ...keys: string[]): string {
@@ -125,6 +131,7 @@ export default function Dashboard() {
     services: [],
     departments: [],
   });
+  const [syncInfo, setSyncInfo] = useState<SyncInfo>({ lastSyncedAt: null, totalEmails: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
@@ -177,6 +184,9 @@ export default function Dashboard() {
         services: data.filters?.services ?? [],
         departments: data.filters?.departments ?? [],
       });
+      if (data.syncInfo) {
+        setSyncInfo(data.syncInfo);
+      }
     }
     setLoading(false);
   }, [page, perPage, sortBy, sortOrder, calendarTypes, company, assignedUsers, receivedFrom, receivedTo, appointmentFrom, appointmentTo, services, departments]);
@@ -199,6 +209,9 @@ export default function Dashboard() {
       const data = await res.json();
       if (res.ok) {
         setSyncMessage(data.message);
+        if (data.lastSyncedAt) {
+          setSyncInfo({ lastSyncedAt: data.lastSyncedAt, totalEmails: data.totalEmails });
+        }
         fetchEmails();
       } else {
         setSyncMessage("エラー: " + data.error);
@@ -251,6 +264,12 @@ export default function Dashboard() {
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
+  const formatSyncDate = (dateStr: string | null) => {
+    if (!dateStr) return "未同期";
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  };
+
   const SortIcon = ({ field }: { field: string }) => (
     <span className="ml-1 text-xs">
       {sortBy === field ? (sortOrder === "asc" ? "▲" : "▼") : "⇅"}
@@ -272,8 +291,20 @@ export default function Dashboard() {
       {/* ヘッダー固定 */}
       <header className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-gray-900">CrowdCalendar Mail Viewer</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-bold text-gray-900">CrowdCalendar Mail Viewer</h1>
+            <Link
+              href="/dashboard/interview-prep"
+              className="px-3 py-1.5 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 font-medium"
+            >
+              取材前 一覧
+            </Link>
+          </div>
           <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500 text-right leading-tight">
+              <div>最終同期: {formatSyncDate(syncInfo.lastSyncedAt)}</div>
+              <div>DB内: {syncInfo.totalEmails}件</div>
+            </div>
             <span className="text-sm text-gray-600">{session?.user?.email}</span>
             <button
               onClick={() => handleSync(false)}

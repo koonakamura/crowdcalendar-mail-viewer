@@ -59,6 +59,7 @@ model Email {
   note                 String?
   qaData               Json?    @map("qa_data")
   rawBody              String?  @map("raw_body") @db.Text
+  subject              String?  @map("subject")
   createdAt            DateTime @default(now()) @map("created_at")
 
   @@map("emails")

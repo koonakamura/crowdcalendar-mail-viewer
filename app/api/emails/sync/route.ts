@@ -27,12 +27,20 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await syncEmails(accessToken, session.user?.email || "");
+
+    const totalEmails = await prisma.email.count();
+    const syncStatus = await prisma.syncStatus.findFirst({
+      where: { userEmail: session.user?.email || "" },
+    });
+
     const msg = resync
       ? `再同期完了: ${result.newCount}件のメールを取得しました`
-      : `同期完了: ${result.newCount}件の新規メールを取得しました（全${result.total}件中）`;
+      : `同期完了: ${result.newCount}件の新規メールを取得しました（Gmail上 ${result.total}件中）`;
     return NextResponse.json({
       message: msg,
       ...result,
+      totalEmails,
+      lastSyncedAt: syncStatus?.lastSyncedAt || null,
     });
   } catch (error: any) {
     console.error("Sync error:", error);
